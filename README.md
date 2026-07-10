@@ -43,6 +43,7 @@ portfolio/
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 18+
 - MongoDB running locally, or a MongoDB Atlas connection string
 
@@ -110,3 +111,35 @@ the exact endpoints.
   placeholder copy until data exists.
 - For production, set `NODE_ENV=production`, a strong `JWT_SECRET`, and
   restrict CORS (`CLIENT_URL`) to your deployed frontend origin.
+
+## Deployment
+
+### Frontend (Vercel)
+
+1. Create a new project in Vercel and point it at the `frontend` folder.
+2. If asked, use:
+   - Build Command: `npm install && npm run build`
+   - Output Directory: `dist`
+3. Add these environment variables in Vercel:
+   - `VITE_API_URL=https://<your-render-backend-url>/api`
+   - `VITE_UPLOADS_URL=https://<your-render-backend-url>`
+4. Deploy and confirm the public site loads.
+
+### Backend (Render)
+
+1. Create a new Web Service in Render and use the `backend` folder as the root.
+2. Set:
+   - Environment: Node
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+3. Add these environment variables in Render:
+   - `MONGO_URI` → your MongoDB connection string
+   - `JWT_SECRET` → a strong secret string
+   - `CLIENT_URL` → your Vercel frontend URL
+     - If you need multiple allowed origins, separate them with commas.
+     - Example: `https://my-site.vercel.app,https://my-site-git-main.vercel.app`
+   - `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` → for initial admin seeding
+   - Optional: `NODE_ENV=production`, `MAX_FILE_SIZE=5242880`
+4. After deploy, run `npm run seed` once with the same environment values to create the admin account.
+
+> Note: `backend/uploads/` is stored locally. On Render, local upload files are ephemeral and may not persist across deploys or restarts. For long-term upload storage, replace local disk storage with a cloud asset store.
