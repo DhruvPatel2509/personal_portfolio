@@ -1,6 +1,10 @@
-const asyncHandler = require('express-async-handler');
-const Settings = require('../models/Settings');
-const { removeFile, toRelativePath } = require('../utils/fileUtils');
+const asyncHandler = require("express-async-handler");
+const Settings = require("../models/Settings");
+const {
+  removeFile,
+  storeUploadedFile,
+  generateCloudinaryPath,
+} = require("../utils/fileUtils");
 
 const getOrCreateSettings = async () => {
   let settings = await Settings.findOne();
@@ -23,21 +27,35 @@ const updateSettings = asyncHandler(async (req, res) => {
   const settings = await getOrCreateSettings();
   const payload = { ...req.body };
 
-  if (payload.seoKeywords && typeof payload.seoKeywords === 'string') {
+  if (payload.seoKeywords && typeof payload.seoKeywords === "string") {
     try {
       payload.seoKeywords = JSON.parse(payload.seoKeywords);
     } catch {
-      payload.seoKeywords = payload.seoKeywords.split(',').map((k) => k.trim());
+      payload.seoKeywords = payload.seoKeywords.split(",").map((k) => k.trim());
     }
   }
 
   if (req.files?.logo?.[0]) {
-    payload.logo = toRelativePath(req.files.logo[0], 'settings');
-    removeFile(settings.logo);
+    const customPath = generateCloudinaryPath("about");
+    payload.logo = await storeUploadedFile(
+      req.files.logo[0],
+      "settings",
+      customPath,
+    );
+    if (settings.logo) {
+      await removeFile(settings.logo);
+    }
   }
-  if (req.files?.favicon?.[0]) {
-    payload.favicon = toRelativePath(req.files.favicon[0], 'settings');
-    removeFile(settings.favicon);
+  if (req.files.favicon) {
+    const customPath = generateCloudinaryPath("about");
+    payload.favicon = await storeUploadedFile(
+      req.files.favicon[0],
+      "settings",
+      customPath,
+    );
+    if (settings.favicon) {
+      await removeFile(settings.favicon);
+    }
   }
 
   const updated = await Settings.findByIdAndUpdate(settings._id, payload, {

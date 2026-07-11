@@ -1,19 +1,27 @@
-const asyncHandler = require('express-async-handler');
-const Certification = require('../models/Certification');
-const { removeFile, toRelativePath } = require('../utils/fileUtils');
-const { fetchCourseraCertificateDetails } = require('../utils/courseraCertificate');
-const { convertPdfFirstPageToPng } = require('../utils/pdfPreview');
+const asyncHandler = require("express-async-handler");
+const Certification = require("../models/Certification");
+const {
+  removeFile,
+  storeUploadedFile,
+  generateCloudinaryPath,
+} = require("../utils/fileUtils");
+const {
+  fetchCourseraCertificateDetails,
+} = require("../utils/courseraCertificate");
+const { convertPdfFirstPageToPng } = require("../utils/pdfPreview");
 
 const normalizeCertificationPayload = (body) => {
   const payload = { ...body };
 
-  if (typeof payload.skills === 'string') {
+  if (typeof payload.skills === "string") {
     payload.skills = payload.skills
-      .split(',')
+      .split(",")
       .map((skill) => skill.trim())
       .filter(Boolean);
   } else if (Array.isArray(payload.skills)) {
-    payload.skills = payload.skills.map((skill) => String(skill).trim()).filter(Boolean);
+    payload.skills = payload.skills
+      .map((skill) => String(skill).trim())
+      .filter(Boolean);
   }
 
   return payload;
@@ -34,7 +42,7 @@ const getCertification = asyncHandler(async (req, res) => {
   const item = await Certification.findById(req.params.id);
   if (!item) {
     res.status(404);
-    throw new Error('Certification not found');
+    throw new Error("Certification not found");
   }
   res.json({ success: true, data: item });
 });
@@ -45,8 +53,17 @@ const getCertification = asyncHandler(async (req, res) => {
 const createCertification = asyncHandler(async (req, res) => {
   const payload = normalizeCertificationPayload(req.body);
   if (req.file) {
+    const certName = payload.certificateName || "certification";
+    console.log(
+      `[CertificationController] Creating cert with name: ${certName}`,
+    );
+    const customPath = generateCloudinaryPath("certificate", certName);
     const previewFile = await convertPdfFirstPageToPng(req.file);
-    payload.image = toRelativePath(previewFile, 'certificates');
+    payload.image = await storeUploadedFile(
+      previewFile,
+      "certificates",
+      customPath,
+    );
   }
 
   const item = await Certification.create(payload);
@@ -60,14 +77,26 @@ const updateCertification = asyncHandler(async (req, res) => {
   const existing = await Certification.findById(req.params.id);
   if (!existing) {
     res.status(404);
-    throw new Error('Certification not found');
+    throw new Error("Certification not found");
   }
 
   const payload = normalizeCertificationPayload(req.body);
   if (req.file) {
+    const certName =
+      payload.certificateName || existing.certificateName || "certification";
+    console.log(
+      `[CertificationController] Updating cert with name: ${certName}`,
+    );
+    const customPath = generateCloudinaryPath("certificate", certName);
     const previewFile = await convertPdfFirstPageToPng(req.file);
-    payload.image = toRelativePath(previewFile, 'certificates');
-    removeFile(existing.image);
+    payload.image = await storeUploadedFile(
+      previewFile,
+      "certificates",
+      customPath,
+    );
+    if (existing.image) {
+      await removeFile(existing.image);
+    }
   }
 
   const item = await Certification.findByIdAndUpdate(req.params.id, payload, {
@@ -84,10 +113,10 @@ const deleteCertification = asyncHandler(async (req, res) => {
   const item = await Certification.findByIdAndDelete(req.params.id);
   if (!item) {
     res.status(404);
-    throw new Error('Certification not found');
+    throw new Error("Certification not found");
   }
-  removeFile(item.image);
-  res.json({ success: true, message: 'Certification deleted successfully' });
+  await removeFile(item.image);
+  res.json({ success: true, message: "Certification deleted successfully" });
 });
 
 // @desc    Fetch certificate details from a credential URL
@@ -98,7 +127,7 @@ const fetchCertificationFromUrl = asyncHandler(async (req, res) => {
 
   if (!url) {
     res.status(400);
-    throw new Error('Credential URL is required');
+    throw new Error("Credential URL is required");
   }
 
   const details = await fetchCourseraCertificateDetails(url);

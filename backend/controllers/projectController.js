@@ -1,6 +1,10 @@
-const asyncHandler = require('express-async-handler');
-const Project = require('../models/Project');
-const { removeFile, toRelativePath } = require('../utils/fileUtils');
+const asyncHandler = require("express-async-handler");
+const Project = require("../models/Project");
+const {
+  removeFile,
+  storeUploadedFile,
+  generateCloudinaryPath,
+} = require("../utils/fileUtils");
 
 // @desc    Get all projects (supports ?tech=, ?search=, ?featured=, ?page=, ?limit=)
 // @route   GET /api/projects
@@ -9,13 +13,13 @@ const getProjects = asyncHandler(async (req, res) => {
   const { tech, search, featured, page = 1, limit = 12 } = req.query;
 
   const filter = {};
-  if (tech) filter.techStack = { $regex: new RegExp(`^${tech}$`, 'i') };
-  if (featured === 'true') filter.featured = true;
+  if (tech) filter.techStack = { $regex: new RegExp(`^${tech}$`, "i") };
+  if (featured === "true") filter.featured = true;
   if (search) {
     filter.$or = [
-      { title: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
-      { techStack: { $regex: search, $options: 'i' } },
+      { title: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+      { techStack: { $regex: search, $options: "i" } },
     ];
   }
 
@@ -24,7 +28,10 @@ const getProjects = asyncHandler(async (req, res) => {
   const skip = (pageNum - 1) * limitNum;
 
   const [projects, total] = await Promise.all([
-    Project.find(filter).sort({ displayOrder: 1, createdAt: -1 }).skip(skip).limit(limitNum),
+    Project.find(filter)
+      .sort({ displayOrder: 1, createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum),
     Project.countDocuments(filter),
   ]);
 
@@ -44,11 +51,13 @@ const getProjects = asyncHandler(async (req, res) => {
 const getProject = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
-  const project = isObjectId ? await Project.findById(id) : await Project.findOne({ slug: id });
+  const project = isObjectId
+    ? await Project.findById(id)
+    : await Project.findOne({ slug: id });
 
   if (!project) {
     res.status(404);
-    throw new Error('Project not found');
+    throw new Error("Project not found");
   }
   res.json({ success: true, data: project });
 });
@@ -57,12 +66,15 @@ const getProject = asyncHandler(async (req, res) => {
 // (common with multipart/form-data since it can't send native arrays).
 const parseArrayField = (value) => {
   if (Array.isArray(value)) return value;
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     try {
       const parsed = JSON.parse(value);
       return Array.isArray(parsed) ? parsed : [value];
     } catch {
-      return value.split(',').map((v) => v.trim()).filter(Boolean);
+      return value
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
     }
   }
   return [];
@@ -77,7 +89,14 @@ const createProject = asyncHandler(async (req, res) => {
   if (payload.features) payload.features = parseArrayField(payload.features);
 
   if (req.files && req.files.length > 0) {
-    payload.images = req.files.map((file) => toRelativePath(file, 'projects'));
+    const projectName = payload.title || "project";
+    console.log(
+      `[ProjectController] Creating project with ${req.files.length} images, project name: ${projectName}`,
+    );
+    const customPath = generateCloudinaryPath("project", projectName);
+    payload.images = await Promise.all(
+      req.files.map((file) => storeUploadedFile(file, "projects", customPath)),
+    );
   }
 
   const project = await Project.create(payload);
@@ -91,7 +110,7 @@ const updateProject = asyncHandler(async (req, res) => {
   const existing = await Project.findById(req.params.id);
   if (!existing) {
     res.status(404);
-    throw new Error('Project not found');
+    throw new Error("Project not found");
   }
 
   const payload = { ...req.body };
@@ -99,9 +118,16 @@ const updateProject = asyncHandler(async (req, res) => {
   if (payload.features) payload.features = parseArrayField(payload.features);
 
   if (req.files && req.files.length > 0) {
-    const newImages = req.files.map((file) => toRelativePath(file, 'projects'));
-    if (req.body.replaceImages === 'true') {
-      existing.images.forEach(removeFile);
+    const projectName = payload.title || existing.title || "project";
+    console.log(
+      `[ProjectController] Updating project with ${req.files.length} images, project name: ${projectName}`,
+    );
+    const customPath = generateCloudinaryPath("project", projectName);
+    const newImages = await Promise.all(
+      req.files.map((file) => storeUploadedFile(file, "projects", customPath)),
+    );
+    if (req.body.replaceImages === "true") {
+      await Promise.all(existing.images.map(removeFile));
       payload.images = newImages;
     } else {
       payload.images = [...existing.images, ...newImages];
@@ -122,10 +148,10 @@ const deleteProject = asyncHandler(async (req, res) => {
   const project = await Project.findByIdAndDelete(req.params.id);
   if (!project) {
     res.status(404);
-    throw new Error('Project not found');
+    throw new Error("Project not found");
   }
-  (project.images || []).forEach(removeFile);
-  res.json({ success: true, message: 'Project deleted successfully' });
+  await Promise.all((project.images || []).map(removeFile));
+  res.json({ success: true, message: "Project deleted successfully" });
 });
 
 // @desc    Remove a single image from a project
@@ -136,11 +162,11 @@ const deleteProjectImage = asyncHandler(async (req, res) => {
   const project = await Project.findById(req.params.id);
   if (!project) {
     res.status(404);
-    throw new Error('Project not found');
+    throw new Error("Project not found");
   }
   project.images = project.images.filter((img) => img !== imagePath);
   await project.save();
-  removeFile(imagePath);
+  await removeFile(imagePath);
   res.json({ success: true, data: project });
 });
 

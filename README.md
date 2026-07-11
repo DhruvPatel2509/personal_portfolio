@@ -140,6 +140,7 @@ the exact endpoints.
      - Example: `https://my-site.vercel.app,https://my-site-git-main.vercel.app`
    - `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` → for initial admin seeding
    - Optional: `NODE_ENV=production`, `MAX_FILE_SIZE=5242880`
+   - Optional: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_FOLDER`
 4. After deploy, run `npm run seed` once with the same environment values to create the admin account.
 
-> Note: `backend/uploads/` is stored locally. On Render, local upload files are ephemeral and may not persist across deploys or restarts. For long-term upload storage, replace local disk storage with a cloud asset store.
+> Note: `backend/uploads/` is stored locally. On Render, local upload files are ephemeral and may not persist across deploys or restarts. For production, use Cloudinary (configured via the backend env vars above) so uploaded assets remain available after deploys.
