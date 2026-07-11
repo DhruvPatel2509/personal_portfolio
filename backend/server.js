@@ -79,6 +79,12 @@ if (process.env.NODE_ENV !== "production") {
 // Static file serving for uploaded images/resume
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Portfolio Backend API Running 🚀",
+  });
+});
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({
