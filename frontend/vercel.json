@@ -1,11 +1,8 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "dist",
-      "use": "@vercel/static"
-    }
-  ],
+  "public": false,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "routes": [
     {
       "src": "/assets/(.*)",
@@ -16,7 +13,10 @@
     },
     {
       "src": "/favicon.svg",
-      "dest": "/favicon.svg"
+      "dest": "/favicon.svg",
+      "headers": {
+        "cache-control": "public, max-age=3600"
+      }
     },
     {
       "src": "/(.*)",
